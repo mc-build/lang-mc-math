@@ -14,7 +14,6 @@ class ScoreConstant {
         `load{\nscoreboard players set ${this.name} ${this.objective} ${this.value}\n}`
       );
     }
-    debugger;
     return {
       o: `${this.name} ${this.objective}`,
       v: this.value,
@@ -62,7 +61,6 @@ class ScoreHolder {
     this.name = name;
     this.objective = objective;
     this.macro = macroopts;
-    if (this.macro != null) console.log(this.macro);
   }
   build(arr, temp) {
     if (this.macro) {
@@ -260,7 +258,6 @@ function parse(parts, str) {
   if (equals) {
     tree = new Op(equals, tree, "=");
   }
-  debugger;
   tree.build(res, () => sid++);
   return [
     `load{\nscoreboard objectives add temp dummy\nscoreboard objectives add const dummy\n}`,
@@ -295,7 +292,6 @@ module.exports = (api) => {
           .split(" ")
           .filter(Boolean);
         const commands = parse(parts, expr);
-        console.log(commands);
         const res = mc.transpiler.tokenize(commands.join("\n"));
         tokens.unshift(...res);
         // commands.forEach((cmd) => func.addCommand(cmd));
