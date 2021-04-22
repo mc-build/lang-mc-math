@@ -175,7 +175,7 @@ class Op {
         return this.left.build();
       }
     } else {
-      let right = this.right.build(arr, temp).o;
+      let right = this.right.build(arr, temp, true).o;
       if (this.op !== "=" || right !== left.o) {
         my.push(
           `scoreboard players operation ${left.o} ${
