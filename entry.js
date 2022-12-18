@@ -1,11 +1,12 @@
 const mathjs = require("mathjs");
 const mc = require("!lang/mc");
+const config = require("!config/mc-math");
 const CompilerError = require("!errors/CompilerError");
 class ScoreConstant {
   constructor(value) {
     this.value = Math.floor(value);
     this.name = "#" + this.value;
-    this.objective = "const";
+    this.objective = config.constScoreboard;
     this.isConst = true;
   }
   build(arr, temp, write) {
@@ -61,12 +62,17 @@ class ScoreHolder {
     this.name = name;
     this.objective = objective;
     this.macro = macroopts;
+    this.clean = true;
   }
   build(arr, temp) {
     if (this.macro) {
       this.getMacro(arr, temp);
     }
-    return { o: `${this.name} ${this.objective}`, clean: true, useSet: false };
+    return {
+      o: `${this.name} ${this.objective}`,
+      clean: this.clean,
+      useSet: false,
+    };
   }
   getMacro(arr, temp) {
     const objectives = this.macro.args.map((_) => _.build(arr, temp, true));
@@ -138,7 +144,7 @@ class Op {
     let my = [];
     let left = this.left.build(arr, temp);
     if (left.clean && !this.op.includes("=")) {
-      let new_left = { o: `${temp()} temp`, clean: false };
+      let new_left = { o: `${temp()} ${config.tempScoreboard}`, clean: false };
       if (left.useSet) {
         my.push(`scoreboard players set ${new_left.o} ${left.v}`);
       } else {
@@ -202,8 +208,6 @@ function fixup(parts) {
     ) {
       res.push(new ScoreHolder(parts[i], parts[i + 1]));
       i++;
-    } else if (isNumber(parts[i])) {
-      res.push(new ScoreConstant(parts[i]));
     } else {
       res.push(parts[i]);
     }
@@ -222,6 +226,7 @@ function parse(parts, str) {
   const parts2 = fixup(parts);
   const lookup = new Map();
   let mid = 0;
+  let selfRef = false;
   function itterate(node) {
     switch (node.type) {
       case "ParenthesisNode":
@@ -229,11 +234,20 @@ function parse(parts, str) {
       case "OperatorNode":
         return new Op(itterate(node.args[0]), itterate(node.args[1]), node.op);
       case "SymbolNode":
+        if (node.name === "$$0") {
+          selfRef = true;
+        }
         return lookup.get(node.name);
       case "FunctionNode":
         const name = node.fn.name;
         const args = node.args.map(itterate);
-        return new ScoreHolder("m_" + mid++, "temp", { name, args });
+        return new ScoreHolder("m_" + mid++, config.tempScoreboard, {
+          name,
+          args,
+        });
+      case "ConstantNode": {
+        return new ScoreConstant(node.value);
+      }
       default:
         console.log(node.type, node);
     }
@@ -249,37 +263,27 @@ function parse(parts, str) {
       }
     })
     .join(" ");
+  /**
+   * @type {ScoreHolder | false}
+   */
   let equals = false;
   if (eq.startsWith("$$0 =")) {
     equals = lookup.get("$$0");
     eq = eq.substr(6);
   }
-  let tree = itterate(mathjs.parse(eq));
-  if (equals) {
+  const mjstree = mathjs.simplify(mathjs.parse(eq));
+  let tree = itterate(mjstree);
+  if (equals !== false) {
+    equals.clean = false;
     tree = new Op(equals, tree, "=");
   }
   tree.build(res, () => sid++);
   return [
-    `load{\nscoreboard objectives add temp dummy\nscoreboard objectives add const dummy\n}`,
+    `load{\nscoreboard objectives add ${config.tempScoreboard} dummy\nscoreboard objectives add ${config.constScoreboard} dummy\n}`,
     ...res,
   ];
 }
 module.exports = (api) => {
-  //   api.registerParticipant(api.participants.generic, "function", (Host) => {
-  //     Host.register(
-  //       B.literal("eq").then(
-  //         B.argument("expr", B.greedyString()).executes((ctx) => {
-  //           const parts = ctx
-  //             .getArgument("expr")
-  //             .replace(/([=()+\-*%/])/g, " $1 ")
-  //             .split(" ")
-  //             .filter(Boolean);
-  //           return parse(parts, ctx.getArgument("expr"));
-  //         })
-  //       )
-  //     );
-  //   });
-
   const transpiler = mc.transpiler;
   const GenericConsumer = transpiler.consumer.Generic;
   GenericConsumer.addAction({
@@ -294,7 +298,6 @@ module.exports = (api) => {
         const commands = parse(parts, expr);
         const res = mc.transpiler.tokenize(commands.join("\n"));
         tokens.unshift(...res);
-        // commands.forEach((cmd) => func.addCommand(cmd));
       } catch (e) {
         throw new CompilerError(`invalid equation '${expr}'`);
       }
