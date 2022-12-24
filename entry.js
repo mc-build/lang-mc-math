@@ -232,6 +232,9 @@ function parse(parts, str) {
       case "ParenthesisNode":
         return itterate(node.content);
       case "OperatorNode":
+        if (node.fn === "unaryMinus") {
+          return new Op(new ScoreConstant(0), itterate(node.args[0]), "-");
+        }
         return new Op(itterate(node.args[0]), itterate(node.args[1]), node.op);
       case "SymbolNode":
         if (node.name === "$$0") {
