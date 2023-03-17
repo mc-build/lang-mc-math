@@ -212,11 +212,7 @@ function fixup(parts) {
       res.push(parts[i]);
     }
   }
-  if (punctuation.includes(parts[parts.length - 1])) {
-    res.push(parts[parts.length - 1]);
-  } else if (isNumber(parts[parts.length - 1])) {
-    res.push(new ScoreConstant(parts[parts.length - 1]));
-  }
+  res.push(parts[parts.length - 1]);
   return res;
 }
 function parse(parts, str) {
